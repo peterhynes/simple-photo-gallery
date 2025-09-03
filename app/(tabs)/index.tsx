@@ -20,44 +20,46 @@ const { width } = Dimensions.get('window');
 const IMAGE_SIZE = width / 3;
 const PAGE_SIZE = 21; // 3 columns * 7 rows
 
-const MediaItem = memo(({ item }: { item: MediaLibrary.Asset }) => {
-  const router = useRouter();
-
-  return (
-    <Pressable
-      style={({ pressed }) => [
-        styles.imageContainer,
-        { opacity: pressed ? 0.8 : 1 },
-      ]}
-      onPress={() =>
-        router.push({
-          pathname: '/media',
-          params: { uri: item.uri, mediaType: item.mediaType },
-        })
-      }>
-      <Image 
-        source={{ uri: item.uri }} 
-        style={styles.image} 
-        contentFit="cover"
-        placeholder={{ thumbhash: 'L0A84nI400000000000000000000' }}
-        transition={300}
-      />
-      {item.mediaType === MediaLibrary.MediaType.video && (
-        <Ionicons
-          name="play"
-          size={32}
-          color="white"
-          style={styles.playIcon}
-          // @ts-ignore
-          stroke="black"
-          strokeWidth={8}
+const MediaItem = memo(
+  ({
+    item,
+    onPress,
+  }: {
+    item: MediaLibrary.Asset;
+    onPress: () => void;
+  }) => {
+    return (
+      <Pressable
+        style={({ pressed }) => [
+          styles.imageContainer,
+          { opacity: pressed ? 0.8 : 1 },
+        ]}
+        onPress={onPress}>
+        <Image
+          source={{ uri: item.uri }}
+          style={styles.image}
+          contentFit="cover"
+          placeholder={{ thumbhash: 'L0A84nI400000000000000000000' }}
+          transition={300}
         />
-      )}
-    </Pressable>
-  );
-});
+        {item.mediaType === MediaLibrary.MediaType.video && (
+          <Ionicons
+            name="play"
+            size={32}
+            color="white"
+            style={styles.playIcon}
+            // @ts-ignore
+            stroke="black"
+            strokeWidth={8}
+          />
+        )}
+      </Pressable>
+    );
+  }
+);
 
 export default function HomeScreen() {
+  const router = useRouter();
   const [media, setMedia] = useState<MediaLibrary.Asset[]>([]);
   const [permissionResponse, requestPermission] = MediaLibrary.usePermissions();
   const [isLoading, setIsLoading] = useState(false);
@@ -127,8 +129,18 @@ export default function HomeScreen() {
   }, [permissionResponse?.granted]);
 
   const renderItem = useCallback(
-    ({ item }: { item: MediaLibrary.Asset }) => <MediaItem item={item} />,
-    []
+    ({ item, index }: { item: MediaLibrary.Asset; index: number }) => (
+      <MediaItem
+        item={item}
+        onPress={() =>
+          router.push({
+            pathname: '/media',
+            params: { assets: JSON.stringify(media), index },
+          })
+        }
+      />
+    ),
+    [media, router]
   );
 
   if (isLoading) {
