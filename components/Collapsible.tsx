@@ -1,4 +1,4 @@
-import { PropsWithChildren, useState } from 'react';
+import { PropsWithChildren, useState, useMemo, memo } from 'react';
 import { StyleSheet, TouchableOpacity } from 'react-native';
 
 import { ThemedText } from '@/components/ThemedText';
@@ -7,9 +7,21 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 
-export function Collapsible({ children, title }: PropsWithChildren & { title: string }) {
+export const Collapsible = memo(function Collapsible({ 
+  children, 
+  title 
+}: PropsWithChildren & { title: string }) {
   const [isOpen, setIsOpen] = useState(false);
   const theme = useColorScheme() ?? 'light';
+
+  const iconColor = useMemo(() => 
+    theme === 'light' ? Colors.light.icon : Colors.dark.icon, 
+    [theme]
+  );
+
+  const rotateStyle = useMemo(() => ({
+    transform: [{ rotate: isOpen ? '90deg' : '0deg' }]
+  }), [isOpen]);
 
   return (
     <ThemedView>
@@ -21,8 +33,8 @@ export function Collapsible({ children, title }: PropsWithChildren & { title: st
           name="chevron.right"
           size={18}
           weight="medium"
-          color={theme === 'light' ? Colors.light.icon : Colors.dark.icon}
-          style={{ transform: [{ rotate: isOpen ? '90deg' : '0deg' }] }}
+          color={iconColor}
+          style={rotateStyle}
         />
 
         <ThemedText type="defaultSemiBold">{title}</ThemedText>
@@ -30,7 +42,7 @@ export function Collapsible({ children, title }: PropsWithChildren & { title: st
       {isOpen && <ThemedView style={styles.content}>{children}</ThemedView>}
     </ThemedView>
   );
-}
+});
 
 const styles = StyleSheet.create({
   heading: {
