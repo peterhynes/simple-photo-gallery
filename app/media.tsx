@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as MediaLibrary from 'expo-media-library';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -59,6 +60,18 @@ export default function FullScreenMediaScreen() {
                 <VideoPlayer uri={item.uri} isVisible={index === visibleIndex} />
               )}
             </Pressable>
+            {item.mediaType === 'photo' && (
+              <Pressable
+                style={styles.editButton}
+                onPress={() =>
+                  router.push({
+                    pathname: '/edit',
+                    params: { imageUri: item.uri, returnIndex: index.toString() },
+                  })
+                }>
+                <Ionicons name="create-outline" size={24} color="white" />
+              </Pressable>
+            )}
           </View>
         )}
         keyExtractor={(item) => item.id}
@@ -96,6 +109,17 @@ const styles = StyleSheet.create({
   pressable: {
     flex: 1,
     width: '100%',
+  },
+  editButton: {
+    position: 'absolute',
+    top: 60,
+    right: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 25,
+    width: 50,
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

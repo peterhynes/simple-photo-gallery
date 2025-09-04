@@ -1,0 +1,302 @@
+import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
+import * as ImageManipulator from 'expo-image-manipulator';
+import * as MediaLibrary from 'expo-media-library';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Pressable,
+  StyleSheet,
+  View,
+} from 'react-native';
+import { GestureHandlerRootView, PanGestureHandler, PinchGestureHandler } from 'react-native-gesture-handler';
+import Animated, {
+  useAnimatedGestureHandler,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
+
+import { ThemedText } from '@/components/ThemedText';
+
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+const CROP_AREA_SIZE = screenWidth - 40;
+
+export default function EditScreen() {
+  const params = useLocalSearchParams<{ imageUri: string; returnIndex: string }>();
+  const router = useRouter();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [rotation, setRotation] = useState(0);
+
+  const scale = useSharedValue(1);
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+
+  const pinchHandler = useAnimatedGestureHandler({
+    onStart: (_, context: any) => {
+      context.startScale = scale.value;
+    },
+    onActive: (event: any, context: any) => {
+      scale.value = Math.max(0.5, Math.min(3, context.startScale * event.scale));
+    },
+    onEnd: () => {
+      if (scale.value < 1) {
+        scale.value = withSpring(1);
+      }
+    },
+  });
+
+  const panHandler = useAnimatedGestureHandler({
+    onStart: (_, context: any) => {
+      context.startX = translateX.value;
+      context.startY = translateY.value;
+    },
+    onActive: (event: any, context: any) => {
+      translateX.value = context.startX + event.translationX;
+      translateY.value = context.startY + event.translationY;
+    },
+  });
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        { translateX: translateX.value },
+        { translateY: translateY.value },
+        { scale: scale.value },
+        { rotate: `${rotation}deg` },
+      ],
+    };
+  });
+
+  const handleRotate = useCallback(() => {
+    setRotation((prev) => (prev + 90) % 360);
+  }, []);
+
+  const handleReset = useCallback(() => {
+    scale.value = withSpring(1);
+    translateX.value = withSpring(0);
+    translateY.value = withSpring(0);
+  }, [scale, translateX, translateY]);
+
+  const handleSave = useCallback(async () => {
+    if (!params.imageUri) return;
+
+    setIsProcessing(true);
+    try {
+      const imageSize = CROP_AREA_SIZE * 2;
+      const currentScale = scale.value;
+      const currentTranslateX = translateX.value;
+      const currentTranslateY = translateY.value;
+
+      const cropData = {
+        originX: Math.max(0, (imageSize - CROP_AREA_SIZE) / 2 - currentTranslateX / currentScale),
+        originY: Math.max(0, (imageSize - CROP_AREA_SIZE) / 2 - currentTranslateY / currentScale),
+        width: Math.min(imageSize, CROP_AREA_SIZE / currentScale),
+        height: Math.min(imageSize, CROP_AREA_SIZE / currentScale),
+      };
+
+      const manipulations = [];
+      if (rotation !== 0) {
+        manipulations.push({ rotate: rotation });
+      }
+      manipulations.push({ crop: cropData });
+
+      let manipulatedImage = await ImageManipulator.manipulateAsync(
+        params.imageUri,
+        manipulations,
+        { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
+      );
+
+      await MediaLibrary.createAssetAsync(manipulatedImage.uri);
+      
+      Alert.alert('Success', 'Image saved to gallery!', [
+        { text: 'OK', onPress: () => router.back() },
+      ]);
+    } catch (error) {
+      console.error('Error saving image:', error);
+      Alert.alert('Error', 'Failed to save image. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [params.imageUri, rotation, scale.value, translateX.value, translateY.value, router]);
+
+  const handleCancel = useCallback(() => {
+    router.back();
+  }, [router]);
+
+  if (!params.imageUri) {
+    return (
+      <View style={styles.container}>
+        <ThemedText>No image selected</ThemedText>
+      </View>
+    );
+  }
+
+  return (
+    <GestureHandlerRootView style={styles.container}>
+      <View style={styles.header}>
+        <Pressable style={styles.headerButton} onPress={handleCancel}>
+          <Ionicons name="close" size={24} color="white" />
+          <ThemedText style={styles.headerButtonText}>Cancel</ThemedText>
+        </Pressable>
+        <ThemedText style={styles.title}>Edit Photo</ThemedText>
+        <Pressable
+          style={[styles.headerButton, isProcessing && styles.disabledButton]}
+          onPress={handleSave}
+          disabled={isProcessing}>
+          {isProcessing ? (
+            <ActivityIndicator size="small" color="white" />
+          ) : (
+            <>
+              <Ionicons name="checkmark" size={24} color="white" />
+              <ThemedText style={styles.headerButtonText}>Save</ThemedText>
+            </>
+          )}
+        </Pressable>
+      </View>
+
+      <View style={styles.imageContainer}>
+        <View style={styles.cropOverlay}>
+          <View style={styles.cropArea}>
+            <View style={styles.cropGrid}>
+              <View style={[styles.gridLine, styles.gridLineVertical, { left: '33.33%' }]} />
+              <View style={[styles.gridLine, styles.gridLineVertical, { left: '66.66%' }]} />
+              <View style={[styles.gridLine, styles.gridLineHorizontal, { top: '33.33%' }]} />
+              <View style={[styles.gridLine, styles.gridLineHorizontal, { top: '66.66%' }]} />
+            </View>
+            <PinchGestureHandler onGestureEvent={pinchHandler}>
+              <Animated.View style={styles.gestureContainer}>
+                <PanGestureHandler onGestureEvent={panHandler}>
+                  <Animated.View style={[styles.imageWrapper, animatedStyle]}>
+                    <Image
+                      source={{ uri: params.imageUri }}
+                      style={styles.image}
+                      contentFit="contain"
+                    />
+                  </Animated.View>
+                </PanGestureHandler>
+              </Animated.View>
+            </PinchGestureHandler>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.controls}>
+        <Pressable style={styles.controlButton} onPress={handleRotate}>
+          <Ionicons name="refresh" size={24} color="white" />
+          <ThemedText style={styles.controlButtonText}>Rotate</ThemedText>
+        </Pressable>
+        <Pressable style={styles.controlButton} onPress={handleReset}>
+          <Ionicons name="refresh-outline" size={24} color="white" />
+          <ThemedText style={styles.controlButtonText}>Reset</ThemedText>
+        </Pressable>
+      </View>
+    </GestureHandlerRootView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: 'black',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  headerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerButtonText: {
+    color: 'white',
+    fontSize: 16,
+  },
+  disabledButton: {
+    opacity: 0.5,
+  },
+  title: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  imageContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cropOverlay: {
+    width: screenWidth,
+    height: screenHeight - 200,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cropArea: {
+    width: CROP_AREA_SIZE,
+    height: CROP_AREA_SIZE,
+    borderWidth: 2,
+    borderColor: 'white',
+    borderStyle: 'dashed',
+    overflow: 'hidden',
+  },
+  gestureContainer: {
+    flex: 1,
+  },
+  imageWrapper: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  image: {
+    width: CROP_AREA_SIZE * 2,
+    height: CROP_AREA_SIZE * 2,
+  },
+  controls: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 20,
+    paddingVertical: 30,
+    paddingHorizontal: 20,
+  },
+  controlButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+  },
+  controlButtonText: {
+    color: 'white',
+    fontSize: 16,
+  },
+  cropGrid: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1,
+  },
+  gridLine: {
+    position: 'absolute',
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  gridLineVertical: {
+    width: 1,
+    height: '100%',
+  },
+  gridLineHorizontal: {
+    height: 1,
+    width: '100%',
+  },
+});
