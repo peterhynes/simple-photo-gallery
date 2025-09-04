@@ -135,7 +135,7 @@ export default function HomeScreen() {
         onPress={() =>
           router.push({
             pathname: '/media',
-            params: { assets: JSON.stringify(media), index },
+            params: { index },
           })
         }
       />
@@ -194,6 +194,14 @@ export default function HomeScreen() {
       numColumns={3}
       onEndReached={loadMoreMedia}
       onEndReachedThreshold={0.5}
+      getItemLayout={(data, index) => ({
+        length: IMAGE_SIZE,
+        offset: IMAGE_SIZE * Math.floor(index / 3),
+        index,
+      })}
+      removeClippedSubviews={true}
+      maxToRenderPerBatch={21}
+      windowSize={10}
       ListFooterComponent={isLoadingMore ? <ActivityIndicator style={styles.footer} /> : null}
     />
   );

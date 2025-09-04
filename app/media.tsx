@@ -3,7 +3,7 @@ import * as MediaLibrary from 'expo-media-library';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { memo, useCallback, useEffect, useState } from 'react';
-import { Dimensions, FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Dimensions, FlatList, Pressable, StyleSheet, View } from 'react-native';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -22,13 +22,31 @@ const VideoPlayer = memo(({ uri, isVisible }: { uri: string; isVisible: boolean 
 });
 
 export default function FullScreenMediaScreen() {
-  const params = useLocalSearchParams<{ assets: string; index: string }>();
+  const params = useLocalSearchParams<{ index: string }>();
   const router = useRouter();
 
-  const assets: MediaLibrary.Asset[] = params.assets ? JSON.parse(params.assets) : [];
+  const [assets, setAssets] = useState<MediaLibrary.Asset[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const initialIndex = params.index ? parseInt(params.index, 10) : 0;
-
   const [visibleIndex, setVisibleIndex] = useState(initialIndex);
+
+  useEffect(() => {
+    async function loadAssets() {
+      try {
+        const { assets: mediaAssets } = await MediaLibrary.getAssetsAsync({
+          mediaType: [MediaLibrary.MediaType.photo, MediaLibrary.MediaType.video],
+          sortBy: ['creationTime'],
+          first: 1000,
+        });
+        setAssets(mediaAssets);
+      } catch (error) {
+        console.error('Failed to load media assets:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadAssets();
+  }, []);
 
   const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: any[] }) => {
     if (viewableItems.length > 0) {
@@ -39,6 +57,14 @@ export default function FullScreenMediaScreen() {
   const viewabilityConfig = {
     itemVisiblePercentThreshold: 50,
   };
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="white" />
+      </View>
+    );
+  }
 
   if (!assets.length) {
     return null;
