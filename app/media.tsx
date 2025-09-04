@@ -21,6 +21,8 @@ const VideoPlayer = memo(({ uri, isVisible }: { uri: string; isVisible: boolean 
   return <VideoView player={player} style={styles.media} contentFit="contain" nativeControls />;
 });
 
+VideoPlayer.displayName = 'VideoPlayer';
+
 export default function FullScreenMediaScreen() {
   const params = useLocalSearchParams<{ assets: string; index: string }>();
   const router = useRouter();

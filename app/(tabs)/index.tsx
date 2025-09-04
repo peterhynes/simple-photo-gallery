@@ -4,14 +4,14 @@ import * as MediaLibrary from 'expo-media-library';
 import { useRouter } from 'expo-router';
 import { memo, useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Button,
-  Dimensions,
-  FlatList,
-  Linking,
-  Pressable,
-  StyleSheet,
-  View,
+    ActivityIndicator,
+    Button,
+    Dimensions,
+    FlatList,
+    Linking,
+    Pressable,
+    StyleSheet,
+    View,
 } from 'react-native';
 
 import { ThemedText } from '@/components/ThemedText';
@@ -58,6 +58,8 @@ const MediaItem = memo(
   }
 );
 
+MediaItem.displayName = 'MediaItem';
+
 export default function HomeScreen() {
   const router = useRouter();
   const [media, setMedia] = useState<MediaLibrary.Asset[]>([]);
@@ -68,7 +70,7 @@ export default function HomeScreen() {
   const [endCursor, setEndCursor] = useState<string | undefined>();
   const [error, setError] = useState<string | null>(null);
 
-  async function loadMedia() {
+  const loadMedia = useCallback(async () => {
     if (permissionResponse?.granted) {
       setIsLoading(true);
       setError(null);
@@ -85,13 +87,13 @@ export default function HomeScreen() {
         setMedia(assets);
         setEndCursor(newEndCursor);
         setHasNextPage(newHasNextPage);
-      } catch (e) {
+      } catch {
         setError('Failed to load media. Please try again.');
       } finally {
         setIsLoading(false);
       }
     }
-  }
+  }, [permissionResponse?.granted]);
 
   async function loadMoreMedia() {
     if (!hasNextPage || isLoadingMore) {
@@ -126,7 +128,7 @@ export default function HomeScreen() {
     if (permissionResponse?.granted) {
       loadMedia();
     }
-  }, [permissionResponse?.granted]);
+  }, [permissionResponse?.granted, loadMedia]);
 
   const renderItem = useCallback(
     ({ item, index }: { item: MediaLibrary.Asset; index: number }) => (
