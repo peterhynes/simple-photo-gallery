@@ -227,8 +227,6 @@ const styles = StyleSheet.create({
   },
   playIcon: {
     position: 'absolute',
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 5,
+    textShadow: '0px 0px 5px rgba(0, 0, 0, 0.75)',
   },
 });
