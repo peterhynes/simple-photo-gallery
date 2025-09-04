@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  FlatList,
   Pressable,
   StyleSheet,
   View,
@@ -19,6 +20,23 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
+import {
+  Grayscale,
+  Sepia,
+  Vintage,
+  Warm,
+  Cool,
+  Brightness,
+  Contrast,
+  normal,
+  grayscale,
+  sepia,
+  vintage,
+  warm,
+  cool,
+  brightness,
+  contrast,
+} from 'react-native-color-matrix-image-filters';
 
 import { ThemedText } from '@/components/ThemedText';
 
@@ -30,10 +48,54 @@ export default function EditScreen() {
   const router = useRouter();
   const [isProcessing, setIsProcessing] = useState(false);
   const [rotation, setRotation] = useState(0);
+  const [selectedFilter, setSelectedFilter] = useState('original');
+  const [showFilters, setShowFilters] = useState(false);
+
+  const filterOptions = [
+    { id: 'original', name: 'Original', component: null, matrix: normal() },
+    { id: 'grayscale', name: 'B&W', component: Grayscale, matrix: grayscale() },
+    { id: 'sepia', name: 'Sepia', component: Sepia, matrix: sepia() },
+    { id: 'vintage', name: 'Vintage', component: Vintage, matrix: vintage() },
+    { id: 'warm', name: 'Warm', component: Warm, matrix: warm() },
+    { id: 'cool', name: 'Cool', component: Cool, matrix: cool() },
+    { id: 'bright', name: 'Bright', component: Brightness, matrix: brightness(1.2) },
+    { id: 'contrast', name: 'Contrast', component: Contrast, matrix: contrast(1.2) },
+  ];
+
+  const currentFilter = filterOptions.find(f => f.id === selectedFilter);
 
   const scale = useSharedValue(1);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
+
+  const FilterThumbnail = useCallback(({ filter, isSelected, onPress }: { 
+    filter: typeof filterOptions[0], 
+    isSelected: boolean, 
+    onPress: () => void 
+  }) => {
+    const FilterComponent = filter.component;
+    const thumbnailImage = (
+      <Image
+        source={{ uri: params.imageUri }}
+        style={styles.filterThumbnail}
+        contentFit="cover"
+      />
+    );
+
+    return (
+      <Pressable
+        style={[styles.filterOption, isSelected && styles.filterOptionSelected]}
+        onPress={onPress}
+      >
+        {FilterComponent ? (
+          <FilterComponent>{thumbnailImage}</FilterComponent>
+        ) : (
+          thumbnailImage
+        )}
+        <ThemedText style={styles.filterName}>{filter.name}</ThemedText>
+      </Pressable>
+    );
+  }, [params.imageUri]);
 
   const pinchHandler = useAnimatedGestureHandler({
     onStart: (_, context: any) => {
@@ -79,6 +141,8 @@ export default function EditScreen() {
     scale.value = withSpring(1);
     translateX.value = withSpring(0);
     translateY.value = withSpring(0);
+    setSelectedFilter('original');
+    setRotation(0);
   }, [scale, translateX, translateY]);
 
   const handleSave = useCallback(async () => {
@@ -86,6 +150,17 @@ export default function EditScreen() {
 
     setIsProcessing(true);
     try {
+      let imageUri = params.imageUri;
+      
+      if (selectedFilter !== 'original' && currentFilter?.matrix) {
+        const filterResult = await ImageManipulator.manipulateAsync(
+          imageUri,
+          [],
+          { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
+        );
+        imageUri = filterResult.uri;
+      }
+
       const imageSize = CROP_AREA_SIZE * 2;
       const currentScale = scale.value;
       const currentTranslateX = translateX.value;
@@ -105,7 +180,7 @@ export default function EditScreen() {
       manipulations.push({ crop: cropData });
 
       let manipulatedImage = await ImageManipulator.manipulateAsync(
-        params.imageUri,
+        imageUri,
         manipulations,
         { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
       );
@@ -121,7 +196,7 @@ export default function EditScreen() {
     } finally {
       setIsProcessing(false);
     }
-  }, [params.imageUri, rotation, scale.value, translateX.value, translateY.value, router]);
+  }, [params.imageUri, selectedFilter, currentFilter, rotation, scale.value, translateX.value, translateY.value, router]);
 
   const handleCancel = useCallback(() => {
     router.back();
@@ -171,11 +246,21 @@ export default function EditScreen() {
               <Animated.View style={styles.gestureContainer}>
                 <PanGestureHandler onGestureEvent={panHandler}>
                   <Animated.View style={[styles.imageWrapper, animatedStyle]}>
-                    <Image
-                      source={{ uri: params.imageUri }}
-                      style={styles.image}
-                      contentFit="contain"
-                    />
+                    {currentFilter?.component ? (
+                      <currentFilter.component>
+                        <Image
+                          source={{ uri: params.imageUri }}
+                          style={styles.image}
+                          contentFit="contain"
+                        />
+                      </currentFilter.component>
+                    ) : (
+                      <Image
+                        source={{ uri: params.imageUri }}
+                        style={styles.image}
+                        contentFit="contain"
+                      />
+                    )}
                   </Animated.View>
                 </PanGestureHandler>
               </Animated.View>
@@ -184,7 +269,30 @@ export default function EditScreen() {
         </View>
       </View>
 
+      {showFilters && (
+        <View style={styles.filtersContainer}>
+          <FlatList
+            data={filterOptions}
+            renderItem={({ item }) => (
+              <FilterThumbnail
+                filter={item}
+                isSelected={selectedFilter === item.id}
+                onPress={() => setSelectedFilter(item.id)}
+              />
+            )}
+            keyExtractor={(item) => item.id}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filtersScrollContent}
+          />
+        </View>
+      )}
+
       <View style={styles.controls}>
+        <Pressable style={styles.controlButton} onPress={() => setShowFilters(!showFilters)}>
+          <Ionicons name="color-filter" size={24} color="white" />
+          <ThemedText style={styles.controlButtonText}>Filters</ThemedText>
+        </Pressable>
         <Pressable style={styles.controlButton} onPress={handleRotate}>
           <Ionicons name="refresh" size={24} color="white" />
           <ThemedText style={styles.controlButtonText}>Rotate</ThemedText>
@@ -298,5 +406,36 @@ const styles = StyleSheet.create({
   gridLineHorizontal: {
     height: 1,
     width: '100%',
+  },
+  filtersContainer: {
+    paddingVertical: 15,
+    paddingHorizontal: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+  },
+  filtersScrollContent: {
+    paddingHorizontal: 10,
+  },
+  filterOption: {
+    alignItems: 'center',
+    marginHorizontal: 8,
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  filterOptionSelected: {
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderWidth: 2,
+    borderColor: 'white',
+  },
+  filterThumbnail: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    marginBottom: 4,
+  },
+  filterName: {
+    color: 'white',
+    fontSize: 12,
+    textAlign: 'center',
   },
 });
