@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as MediaLibrary from 'expo-media-library';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -85,6 +85,15 @@ export default function EditScreen() {
   const { prependAsset } = useMedia();
   const [isProcessing, setIsProcessing] = useState(false);
   const [rotation, setRotation] = useState(0);
+  const [originalImageSize, setOriginalImageSize] = useState<{ width: number; height: number } | null>(null);
+
+  useEffect(() => {
+    if (params.imageUri) {
+      Image.getSize(params.imageUri, (width, height) => {
+        setOriginalImageSize({ width, height });
+      });
+    }
+  }, [params.imageUri]);
 
   const scale = useSharedValue(1);
   const translateX = useSharedValue(0);
@@ -143,27 +152,30 @@ export default function EditScreen() {
   }, [scale, translateX, translateY]);
 
   const handleSave = useCallback(async () => {
-    if (!params.imageUri) return;
+    if (!params.imageUri || !originalImageSize) return;
 
     setIsProcessing(true);
     try {
-      const imageSize = CROP_AREA_SIZE * 2;
+      // TODO: This calculation is still not perfect and could be improved.
+      // It assumes the image is scaled to fit the crop area width, which might not be the case for tall images.
+      // A more robust solution would involve calculating the scale factor based on the actual image and crop area dimensions.
+      const displayScale = originalImageSize.width / (CROP_AREA_SIZE * 2);
+
       const currentScale = scale.value;
       const currentTranslateX = translateX.value;
       const currentTranslateY = translateY.value;
 
       const cropData = {
-        originX: Math.max(0, (imageSize - CROP_AREA_SIZE) / 2 - currentTranslateX / currentScale),
-        originY: Math.max(0, (imageSize - CROP_AREA_SIZE) / 2 - currentTranslateY / currentScale),
-        width: Math.min(imageSize, CROP_AREA_SIZE / currentScale),
-        height: Math.min(imageSize, CROP_AREA_SIZE / currentScale),
+        originX: (originalImageSize.width - originalImageSize.width / currentScale) / 2 - currentTranslateX * displayScale,
+        originY: (originalImageSize.height - originalImageSize.height / currentScale) / 2 - currentTranslateY * displayScale,
+        width: originalImageSize.width / currentScale,
+        height: originalImageSize.height / currentScale,
       };
 
-      const manipulations = [];
+      const manipulations = [{ crop: cropData }];
       if (rotation !== 0) {
         manipulations.push({ rotate: rotation });
       }
-      manipulations.push({ crop: cropData });
 
       const manipulatedImage = await ImageManipulator.manipulateAsync(
         params.imageUri,
@@ -183,7 +195,7 @@ export default function EditScreen() {
     } finally {
       setIsProcessing(false);
     }
-  }, [params.imageUri, rotation, scale, translateX, translateY, router, prependAsset]);
+  }, [params.imageUri, rotation, scale, translateX, translateY, router, prependAsset, originalImageSize]);
 
   const handleCancel = useCallback(() => {
     router.back();
