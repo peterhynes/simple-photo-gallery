@@ -39,18 +39,24 @@ const PAGE_SIZE = 21; // 3 columns * 7 rows
 const MediaItem = memo(
   ({
     item,
+    index,
     onPress,
   }: {
     item: MediaLibrary.Asset;
-    onPress: () => void;
+    index: number;
+    onPress: (index: number) => void;
   }) => {
+    const handlePress = () => {
+      onPress(index);
+    };
+
     return (
       <Pressable
         style={({ pressed }) => [
           styles.imageContainer,
           { opacity: pressed ? 0.8 : 1 },
         ]}
-        onPress={onPress}>
+        onPress={handlePress}>
         <Image
           source={{ uri: item.uri }}
           style={styles.image}
@@ -175,19 +181,21 @@ export default function HomeScreen() {
     }
   }, [permissionResponse?.granted, assets.length, loadMedia]);
 
+  const handleItemPress = useCallback(
+    (index: number) => {
+      router.push({
+        pathname: '/media',
+        params: { index: index.toString() },
+      });
+    },
+    [router]
+  );
+
   const renderItem = useCallback(
     ({ item, index }: { item: MediaLibrary.Asset; index: number }) => (
-      <MediaItem
-        item={item}
-        onPress={() =>
-          router.push({
-            pathname: '/media',
-            params: { index: index.toString() },
-          })
-        }
-      />
+      <MediaItem item={item} index={index} onPress={handleItemPress} />
     ),
-    [router]
+    [handleItemPress]
   );
 
   if (isLoading) {
