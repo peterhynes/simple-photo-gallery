@@ -31,10 +31,18 @@ import { ThemedText } from '@/components/ThemedText';
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const CROP_AREA_SIZE = screenWidth - 40;
 
+/**
+ * The context for the pinch gesture handler.
+ * Used to store the starting scale of the image when the pinch gesture begins.
+ */
 type PinchContext = {
   startScale: number;
 };
 
+/**
+ * The context for the pan gesture handler.
+ * Used to store the starting translation values of the image when the pan gesture begins.
+ */
 type PanContext = {
   startX: number;
   startY: number;
@@ -172,7 +180,7 @@ export default function EditScreen() {
     } finally {
       setIsProcessing(false);
     }
-  }, [params.imageUri, rotation, scale.value, translateX.value, translateY.value, router]);
+  }, [params.imageUri, rotation, scale, translateX, translateY, router]);
 
   const handleCancel = useCallback(() => {
     router.back();
