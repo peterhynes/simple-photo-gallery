@@ -147,7 +147,7 @@ export default function EditScreen() {
         { translateX: translateX.value },
         { translateY: translateY.value },
         { scale: scale.value },
-        { rotate: `${rotation}deg` },
+        { rotate: `${rotation.value}deg` },
       ],
     };
   });
