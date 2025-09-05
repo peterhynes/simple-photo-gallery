@@ -8,6 +8,29 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 
+/**
+ * `TabTwoScreen` is a React component that serves as the "Explore" screen in the tab navigator.
+ * This screen is designed to provide information and examples about the features of the application,
+ * making it a resource for developers to understand the codebase.
+ *
+ * The screen's layout is built using a `ParallaxScrollView`, which creates a visually engaging
+ * parallax effect for the header image. The header image itself is an `IconSymbol`.
+ *
+ * The content of the screen is organized into a series of `Collapsible` components, each covering
+ * a different topic related to the app's development. These topics include:
+ * - File-based routing with `expo-router`.
+ * - Support for Android, iOS, and web platforms.
+ * - Handling of static images with different screen densities.
+ * - Integration of custom fonts.
+ * - Implementation of light and dark mode themes.
+ * - Use of animations with `react-native-reanimated`.
+ *
+ * Each section provides a brief explanation and often includes an `ExternalLink` to the relevant
+ * documentation for more in-depth information. The component uses `ThemedText` and `ThemedView`
+ * to ensure that the UI adapts to the current color scheme.
+ *
+ * @returns {React.ReactElement} The rendered "Explore" screen component.
+ */
 export default function TabTwoScreen() {
   return (
     <ParallaxScrollView
