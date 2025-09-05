@@ -11,6 +11,8 @@ interface MediaContextData {
   setAssets: (assets: MediaLibrary.Asset[]) => void;
   /** Function to append new assets to the existing array. */
   addAssets: (assets: MediaLibrary.Asset[]) => void;
+  /** Function to prepend a single asset to the beginning of the array. */
+  prependAsset: (asset: MediaLibrary.Asset) => void;
 }
 
 /**
@@ -36,7 +38,11 @@ export const MediaProvider = ({ children }: PropsWithChildren) => {
     setAssets((prevAssets) => [...prevAssets, ...newAssets]);
   };
 
-  const value = { assets, setAssets, addAssets };
+  const prependAsset = (newAsset: MediaLibrary.Asset) => {
+    setAssets((prevAssets) => [newAsset, ...prevAssets]);
+  };
+
+  const value = { assets, setAssets, addAssets, prependAsset };
 
   return <MediaContext.Provider value={value}>{children}</MediaContext.Provider>;
 };

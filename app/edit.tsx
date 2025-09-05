@@ -27,6 +27,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/ThemedText';
+import { useMedia } from '@/context/MediaContext';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const CROP_AREA_SIZE = screenWidth - 40;
@@ -81,6 +82,7 @@ type PanContext = {
 export default function EditScreen() {
   const params = useLocalSearchParams<{ imageUri: string; returnIndex: string }>();
   const router = useRouter();
+  const { prependAsset } = useMedia();
   const [isProcessing, setIsProcessing] = useState(false);
   const [rotation, setRotation] = useState(0);
 
@@ -163,14 +165,15 @@ export default function EditScreen() {
       }
       manipulations.push({ crop: cropData });
 
-      let manipulatedImage = await ImageManipulator.manipulateAsync(
+      const manipulatedImage = await ImageManipulator.manipulateAsync(
         params.imageUri,
         manipulations,
         { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
       );
 
-      await MediaLibrary.createAssetAsync(manipulatedImage.uri);
-      
+      const newAsset = await MediaLibrary.createAssetAsync(manipulatedImage.uri);
+      prependAsset(newAsset);
+
       Alert.alert('Success', 'Image saved to gallery!', [
         { text: 'OK', onPress: () => router.back() },
       ]);
@@ -180,7 +183,7 @@ export default function EditScreen() {
     } finally {
       setIsProcessing(false);
     }
-  }, [params.imageUri, rotation, scale, translateX, translateY, router]);
+  }, [params.imageUri, rotation, scale, translateX, translateY, router, prependAsset]);
 
   const handleCancel = useCallback(() => {
     router.back();
