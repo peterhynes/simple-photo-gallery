@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
+import { Image as ExpoImage } from 'expo-image';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as MediaLibrary from 'expo-media-library';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -11,6 +11,7 @@ import {
   Pressable,
   StyleSheet,
   View,
+  Image,
 } from 'react-native';
 import {
   GestureHandlerRootView,
@@ -245,7 +246,7 @@ export default function EditScreen() {
               <Animated.View style={styles.gestureContainer}>
                 <PanGestureHandler onGestureEvent={panHandler}>
                   <Animated.View style={[styles.imageWrapper, animatedStyle]}>
-                    <Image
+                    <ExpoImage
                       source={{ uri: params.imageUri }}
                       style={styles.image}
                       contentFit="contain"
