@@ -250,7 +250,7 @@ export default function HomeScreen() {
 
   return (
     <FlatList
-      data={media}
+      data={assets}
       renderItem={renderItem}
       keyExtractor={(item) => item.id}
       numColumns={3}
