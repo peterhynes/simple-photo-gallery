@@ -50,6 +50,8 @@ type PanContext = {
   startY: number;
 };
 
+type EditMode = 'view' | 'crop';
+
 /**
  * `EditScreen` is a comprehensive image editing component that allows users to perform basic
  * transformations on an image, such as panning, pinching (zooming), and rotating.
@@ -85,8 +87,20 @@ export default function EditScreen() {
   const router = useRouter();
   const { prependAsset } = useMedia();
   const [isProcessing, setIsProcessing] = useState(false);
-  const [rotation, setRotation] = useState(0);
   const [originalImageSize, setOriginalImageSize] = useState<{ width: number; height: number } | null>(null);
+  const [editMode, setEditMode] = useState<EditMode>('view');
+
+  // Active transform values (shared values for reanimated)
+  const scale = useSharedValue(1);
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  const rotation = useSharedValue(0);
+
+  // Committed transform values
+  const committedScale = useSharedValue(1);
+  const committedTranslateX = useSharedValue(0);
+  const committedTranslateY = useSharedValue(0);
+  const committedRotation = useSharedValue(0);
 
   useEffect(() => {
     if (params.imageUri) {
@@ -146,11 +160,38 @@ export default function EditScreen() {
     setRotation((prev) => (prev + 90) % 360);
   }, []);
 
+  const handleRotate = useCallback(() => {
+    rotation.value = withSpring((rotation.value + 90) % 360);
+  }, [rotation]);
+
   const handleReset = useCallback(() => {
-    scale.value = withSpring(1);
-    translateX.value = withSpring(0);
-    translateY.value = withSpring(0);
-  }, [scale, translateX, translateY]);
+    scale.value = withSpring(committedScale.value);
+    translateX.value = withSpring(committedTranslateX.value);
+    translateY.value = withSpring(committedTranslateY.value);
+    rotation.value = withSpring(committedRotation.value);
+  }, [scale, translateX, translateY, rotation, committedScale, committedTranslateX, committedTranslateY, committedRotation]);
+
+  const handleEnterCropMode = () => {
+    setEditMode('crop');
+  };
+
+  const handleCancelCrop = () => {
+    // Reset to last committed values
+    scale.value = withSpring(committedScale.value);
+    translateX.value = withSpring(committedTranslateX.value);
+    translateY.value = withSpring(committedTranslateY.value);
+    rotation.value = withSpring(committedRotation.value);
+    setEditMode('view');
+  };
+
+  const handleDoneCrop = () => {
+    // Commit the current values
+    committedScale.value = scale.value;
+    committedTranslateX.value = translateX.value;
+    committedTranslateY.value = translateY.value;
+    committedRotation.value = rotation.value;
+    setEditMode('view');
+  };
 
   const handleSave = useCallback(async () => {
     if (!params.imageUri || !originalImageSize) return;
@@ -162,20 +203,16 @@ export default function EditScreen() {
       // A more robust solution would involve calculating the scale factor based on the actual image and crop area dimensions.
       const displayScale = originalImageSize.width / (CROP_AREA_SIZE * 2);
 
-      const currentScale = scale.value;
-      const currentTranslateX = translateX.value;
-      const currentTranslateY = translateY.value;
-
       const cropData = {
-        originX: (originalImageSize.width - originalImageSize.width / currentScale) / 2 - currentTranslateX * displayScale,
-        originY: (originalImageSize.height - originalImageSize.height / currentScale) / 2 - currentTranslateY * displayScale,
-        width: originalImageSize.width / currentScale,
-        height: originalImageSize.height / currentScale,
+        originX: (originalImageSize.width - originalImageSize.width / committedScale.value) / 2 - committedTranslateX.value * displayScale,
+        originY: (originalImageSize.height - originalImageSize.height / committedScale.value) / 2 - committedTranslateY.value * displayScale,
+        width: originalImageSize.width / committedScale.value,
+        height: originalImageSize.height / committedScale.value,
       };
 
       const manipulations = [{ crop: cropData }];
-      if (rotation !== 0) {
-        manipulations.push({ rotate: rotation });
+      if (committedRotation.value !== 0) {
+        manipulations.push({ rotate: committedRotation.value });
       }
 
       const manipulatedImage = await ImageManipulator.manipulateAsync(
@@ -196,7 +233,16 @@ export default function EditScreen() {
     } finally {
       setIsProcessing(false);
     }
-  }, [params.imageUri, rotation, scale, translateX, translateY, router, prependAsset, originalImageSize]);
+  }, [
+    params.imageUri,
+    router,
+    prependAsset,
+    originalImageSize,
+    committedScale,
+    committedTranslateX,
+    committedTranslateY,
+    committedRotation,
+  ]);
 
   const handleCancel = useCallback(() => {
     router.back();
@@ -210,8 +256,24 @@ export default function EditScreen() {
     );
   }
 
-  return (
-    <GestureHandlerRootView style={styles.container}>
+  const renderHeader = () => {
+    if (editMode === 'crop') {
+      return (
+        <View style={styles.header}>
+          <Pressable style={styles.headerButton} onPress={handleCancelCrop}>
+            <Ionicons name="close" size={24} color="white" />
+            <ThemedText style={styles.headerButtonText}>Cancel</ThemedText>
+          </Pressable>
+          <ThemedText style={styles.title}>Crop & Rotate</ThemedText>
+          <Pressable style={styles.headerButton} onPress={handleDoneCrop}>
+            <Ionicons name="checkmark" size={24} color="white" />
+            <ThemedText style={styles.headerButtonText}>Done</ThemedText>
+          </Pressable>
+        </View>
+      );
+    }
+
+    return (
       <View style={styles.header}>
         <Pressable style={styles.headerButton} onPress={handleCancel}>
           <Ionicons name="close" size={24} color="white" />
@@ -232,19 +294,26 @@ export default function EditScreen() {
           )}
         </Pressable>
       </View>
+    );
+  };
 
+  return (
+    <GestureHandlerRootView style={styles.container}>
+      {renderHeader()}
       <View style={styles.imageContainer}>
         <View style={styles.cropOverlay}>
           <View style={styles.cropArea}>
-            <View style={styles.cropGrid}>
-              <View style={[styles.gridLine, styles.gridLineVertical, { left: '33.33%' }]} />
-              <View style={[styles.gridLine, styles.gridLineVertical, { left: '66.66%' }]} />
-              <View style={[styles.gridLine, styles.gridLineHorizontal, { top: '33.33%' }]} />
-              <View style={[styles.gridLine, styles.gridLineHorizontal, { top: '66.66%' }]} />
-            </View>
-            <PinchGestureHandler onGestureEvent={pinchHandler}>
+            {editMode === 'crop' && (
+              <View style={styles.cropGrid}>
+                <View style={[styles.gridLine, styles.gridLineVertical, { left: '33.33%' }]} />
+                <View style={[styles.gridLine, styles.gridLineVertical, { left: '66.66%' }]} />
+                <View style={[styles.gridLine, styles.gridLineHorizontal, { top: '33.33%' }]} />
+                <View style={[styles.gridLine, styles.gridLineHorizontal, { top: '66.66%' }]} />
+              </View>
+            )}
+            <PinchGestureHandler onGestureEvent={pinchHandler} enabled={editMode === 'crop'}>
               <Animated.View style={styles.gestureContainer}>
-                <PanGestureHandler onGestureEvent={panHandler}>
+                <PanGestureHandler onGestureEvent={panHandler} enabled={editMode === 'crop'}>
                   <Animated.View style={[styles.imageWrapper, animatedStyle]}>
                     <ExpoImage
                       source={{ uri: params.imageUri }}
@@ -259,16 +328,29 @@ export default function EditScreen() {
         </View>
       </View>
 
-      <View style={styles.controls}>
-        <Pressable style={styles.controlButton} onPress={handleRotate}>
-          <Ionicons name="refresh" size={24} color="white" />
-          <ThemedText style={styles.controlButtonText}>Rotate</ThemedText>
-        </Pressable>
-        <Pressable style={styles.controlButton} onPress={handleReset}>
-          <Ionicons name="refresh-outline" size={24} color="white" />
-          <ThemedText style={styles.controlButtonText}>Reset</ThemedText>
-        </Pressable>
-      </View>
+      {editMode === 'crop' && (
+        <View style={styles.cropControls}>
+          <Pressable style={styles.controlButton} onPress={handleRotate}>
+            <Ionicons name="refresh" size={24} color="white" />
+            <ThemedText style={styles.controlButtonText}>Rotate</ThemedText>
+          </Pressable>
+          <Pressable style={styles.controlButton} onPress={handleReset}>
+            <Ionicons name="refresh-outline" size={24} color="white" />
+            <ThemedText style={styles.controlButtonText}>Reset</ThemedText>
+          </Pressable>
+        </View>
+      )}
+
+      {editMode === 'view' && (
+        <View style={styles.toolbar}>
+          <Pressable
+            style={styles.toolbarButton}
+            onPress={handleEnterCropMode}>
+            <Ionicons name="crop" size={24} color="white" />
+            <ThemedText style={styles.toolbarButtonText}>Crop & Rotate</ThemedText>
+          </Pressable>
+        </View>
+      )}
     </GestureHandlerRootView>
   );
 }
@@ -334,7 +416,7 @@ const styles = StyleSheet.create({
     width: CROP_AREA_SIZE * 2,
     height: CROP_AREA_SIZE * 2,
   },
-  controls: {
+  cropControls: {
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 20,
@@ -353,6 +435,24 @@ const styles = StyleSheet.create({
   controlButtonText: {
     color: 'white',
     fontSize: 16,
+  },
+  toolbar: {
+    height: 100,
+    width: '100%',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingBottom: 20,
+  },
+  toolbarButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  toolbarButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
   cropGrid: {
     position: 'absolute',
