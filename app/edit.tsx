@@ -15,10 +15,8 @@ import {
 } from 'react-native';
 import {
   GestureHandlerRootView,
-  PanGestureHandler,
-  PinchGestureHandler,
-  PanGestureHandlerGestureEvent,
-  PinchGestureHandlerGestureEvent,
+  GestureDetector,
+  Gesture,
 } from 'react-native-gesture-handler';
 import Animated, {
   useAnimatedGestureHandler,
@@ -26,6 +24,8 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
+import { Canvas, useImage, Image as SkiaImage, Rect, Group, Circle } from '@shopify/react-native-skia';
+
 
 import { ThemedText } from '@/components/ThemedText';
 import { useMedia } from '@/context/MediaContext';
@@ -33,64 +33,24 @@ import { useMedia } from '@/context/MediaContext';
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const CROP_AREA_SIZE = screenWidth - 40;
 
-/**
- * The context for the pinch gesture handler.
- * Used to store the starting scale of the image when the pinch gesture begins.
- */
-type PinchContext = {
-  startScale: number;
-};
-
-/**
- * The context for the pan gesture handler.
- * Used to store the starting translation values of the image when the pan gesture begins.
- */
-type PanContext = {
-  startX: number;
-  startY: number;
-};
-
 type EditMode = 'view' | 'crop';
 
-/**
- * `EditScreen` is a comprehensive image editing component that allows users to perform basic
- * transformations on an image, such as panning, pinching (zooming), and rotating.
- * The screen is designed to provide a rich, interactive experience for editing photos.
- *
- * Key features of this screen include:
- * - **Gesture Handling:** It uses `react-native-gesture-handler` to manage pan and pinch gestures.
- *   - `PinchGestureHandler` allows users to zoom in and out of the image.
- *   - `PanGestureHandler` enables users to move the image within the crop area.
- * - **Animations:** The component leverages `react-native-reanimated` to create smooth animations
- *   for scaling, translation, and rotation of the image. `useSharedValue` and `useAnimatedStyle`
- *   are used to manage the animated properties.
- * - **Image Manipulation:** It utilizes `expo-image-manipulator` to apply the transformations
- *   (rotation and cropping) to the image when the user saves their changes.
- * - **UI Controls:** The screen provides a set of UI controls for:
- *   - **Saving:** Applies the edits and saves the new image to the media library.
- *   - **Canceling:** Discards the changes and navigates back to the previous screen.
- *   - **Rotating:** Rotates the image by 90-degree increments.
- *   - **Resetting:** Resets all transformations to their initial state.
- * - **Crop Overlay:** A visual crop area with a grid is displayed to guide the user's edits.
- *   The final image is cropped to this area.
- * - **State Management:** The component manages the state of the editing process, including
- *   whether the image is currently being processed, the rotation angle, and the gesture-driven
- *   transformations.
- *
- * The `useLocalSearchParams` hook is used to receive the URI of the image to be edited from the
- * navigation parameters. After saving, the user is alerted of the success and navigated back.
- *
- * @returns {React.ReactElement} The rendered image editing screen.
- */
 export default function EditScreen() {
-  const params = useLocalSearchParams<{ imageUri: string; returnIndex: string }>();
+  const params = useLocalSearchParams<{ imageUri: string }>();
   const router = useRouter();
   const { prependAsset } = useMedia();
+  const image = useImage(params.imageUri);
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [originalImageSize, setOriginalImageSize] = useState<{ width: number; height: number } | null>(null);
   const [editMode, setEditMode] = useState<EditMode>('view');
 
-  // Active transform values (shared values for reanimated)
+  const cropX = useSharedValue(50);
+  const cropY = useSharedValue(100);
+  const cropWidth = useSharedValue(screenWidth - 100);
+  const cropHeight = useSharedValue(screenWidth - 100);
+
+  // Active transform values
   const scale = useSharedValue(1);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -110,36 +70,6 @@ export default function EditScreen() {
     }
   }, [params.imageUri]);
 
-  const pinchHandler = useAnimatedGestureHandler<
-    PinchGestureHandlerGestureEvent,
-    PinchContext
-  >({
-    onStart: (_, context) => {
-      context.startScale = scale.value;
-    },
-    onActive: (event, context) => {
-      scale.value = Math.max(0.5, Math.min(3, context.startScale * event.scale));
-    },
-    onEnd: () => {
-      if (scale.value < 1) {
-        scale.value = withSpring(1);
-      }
-    },
-  });
-
-  const panHandler = useAnimatedGestureHandler<
-    PanGestureHandlerGestureEvent,
-    PanContext
-  >({
-    onStart: (_, context) => {
-      context.startX = translateX.value;
-      context.startY = translateY.value;
-    },
-    onActive: (event, context) => {
-      translateX.value = context.startX + event.translationX;
-      translateY.value = context.startY + event.translationY;
-    },
-  });
 
   const animatedStyle = useAnimatedStyle(() => {
     return {
@@ -151,6 +81,8 @@ export default function EditScreen() {
       ],
     };
   });
+
+  const handleCancel = () => router.back();
 
   const handleRotate = useCallback(() => {
     rotation.value = withSpring((rotation.value + 90) % 360);
@@ -168,16 +100,13 @@ export default function EditScreen() {
   };
 
   const handleCancelCrop = () => {
-    // Reset to last committed values
-    scale.value = withSpring(committedScale.value);
-    translateX.value = withSpring(committedTranslateX.value);
-    translateY.value = withSpring(committedTranslateY.value);
-    rotation.value = withSpring(committedRotation.value);
+    // Reset active transforms to last committed values
+    handleReset();
     setEditMode('view');
   };
 
   const handleDoneCrop = () => {
-    // Commit the current values
+    // Commit the active transforms
     committedScale.value = scale.value;
     committedTranslateX.value = translateX.value;
     committedTranslateY.value = translateY.value;
@@ -185,62 +114,90 @@ export default function EditScreen() {
     setEditMode('view');
   };
 
-  const handleSave = useCallback(async () => {
-    if (!params.imageUri || !originalImageSize) return;
+  const handleAspectRatioPress = (ratio: number) => {
+    const canvasWidth = screenWidth;
+    const canvasHeight = screenHeight - 200; // Approximate area for the image view
 
-    setIsProcessing(true);
-    try {
-      // TODO: This calculation is still not perfect and could be improved.
-      // It assumes the image is scaled to fit the crop area width, which might not be the case for tall images.
-      // A more robust solution would involve calculating the scale factor based on the actual image and crop area dimensions.
-      const displayScale = originalImageSize.width / (CROP_AREA_SIZE * 2);
+    let newWidth = cropWidth.value;
+    let newHeight = newWidth / ratio;
 
-      const cropData = {
-        originX: (originalImageSize.width - originalImageSize.width / committedScale.value) / 2 - committedTranslateX.value * displayScale,
-        originY: (originalImageSize.height - originalImageSize.height / committedScale.value) / 2 - committedTranslateY.value * displayScale,
-        width: originalImageSize.width / committedScale.value,
-        height: originalImageSize.height / committedScale.value,
-      };
-
-      const manipulations = [{ crop: cropData }];
-      if (committedRotation.value !== 0) {
-        manipulations.push({ rotate: committedRotation.value });
-      }
-
-      const manipulatedImage = await ImageManipulator.manipulateAsync(
-        params.imageUri,
-        manipulations,
-        { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
-      );
-
-      const newAsset = await MediaLibrary.createAssetAsync(manipulatedImage.uri);
-      prependAsset(newAsset);
-
-      Alert.alert('Success', 'Image saved to gallery!', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
-    } catch (error) {
-      console.error('Error saving image:', error);
-      Alert.alert('Error', 'Failed to save image. Please try again.');
-    } finally {
-      setIsProcessing(false);
+    if (newHeight > canvasHeight) {
+      newHeight = canvasHeight;
+      newWidth = newHeight * ratio;
     }
-  }, [
-    params.imageUri,
-    router,
-    prependAsset,
-    originalImageSize,
-    committedScale,
-    committedTranslateX,
-    committedTranslateY,
-    committedRotation,
-  ]);
+    if (newWidth > canvasWidth) {
+        newWidth = canvasWidth;
+        newHeight = newWidth / ratio;
+    }
 
-  const handleCancel = useCallback(() => {
-    router.back();
-  }, [router]);
+    const newX = (screenWidth - newWidth) / 2;
+    const newY = (canvasHeight - newHeight) / 2 + 100; // Adjust for header approx
 
-  if (!params.imageUri) {
+    cropX.value = withSpring(newX);
+    cropY.value = withSpring(newY);
+    cropWidth.value = withSpring(newWidth);
+    cropHeight.value = withSpring(newHeight);
+  };
+
+  const handleSave = useCallback(async () => {
+    if (!image || !originalImageSize) {
+      return;
+    }
+
+    // Calculate the scale factor of how the image is displayed with "fit: 'contain'"
+    const scaleX = screenWidth / originalImageSize.width;
+    const scaleY = (screenHeight - 300) / originalImageSize.height; // Approximate screen space for image
+    const scale = Math.min(scaleX, scaleY);
+
+    // Calculate the position of the displayed image within the canvas
+    const displayedWidth = originalImageSize.width * scale;
+    const displayedHeight = originalImageSize.height * scale;
+    const offsetX = (screenWidth - displayedWidth) / 2;
+    const offsetY = (screenHeight - displayedHeight) / 2;
+
+    // Translate the on-screen crop rectangle coordinates to the original image's coordinate system
+    const cropData = {
+        originX: (cropX.value - offsetX) / scale,
+        originY: (cropY.value - offsetY) / scale,
+        width: cropWidth.value / scale,
+        height: cropHeight.value / scale,
+    };
+
+    const manipulations = [{ crop: cropData }];
+    if (committedRotation.value !== 0) {
+        manipulations.push({ rotate: committedRotation.value });
+    }
+
+    try {
+        setIsProcessing(true);
+        const manipulatedImage = await ImageManipulator.manipulateAsync(
+            image.uri,
+            manipulations,
+            { compress: 1, format: ImageManipulator.SaveFormat.JPEG }
+        );
+        const newAsset = await MediaLibrary.createAssetAsync(manipulatedImage.uri);
+        prependAsset(newAsset);
+        router.back();
+    } catch (error) {
+        console.error('Error saving image:', error);
+        Alert.alert('Error', 'Failed to save image.');
+    } finally {
+        setIsProcessing(false);
+    }
+  }, [image, originalImageSize, prependAsset, router, cropX, cropY, cropWidth, cropHeight, committedRotation]);
+
+  const HANDLE_SIZE = 20; // Increased for easier grabbing
+
+  // --- Gesture Handlers ---
+  const panGesture = Gesture.Pan()
+    .onChange((event) => {
+        cropWidth.value += event.changeX;
+        cropHeight.value += event.changeY;
+    });
+  // ----------------------
+
+
+  if (!params.imageUri || !image) {
     return (
       <View style={styles.container}>
         <ThemedText>No image selected</ThemedText>
@@ -293,42 +250,78 @@ export default function EditScreen() {
     <GestureHandlerRootView style={styles.container}>
       {renderHeader()}
       <View style={styles.imageContainer}>
-        <View style={styles.cropOverlay}>
-          <View style={styles.cropArea}>
-            {editMode === 'crop' && (
-              <View style={styles.cropGrid}>
-                <View style={[styles.gridLine, styles.gridLineVertical, { left: '33.33%' }]} />
-                <View style={[styles.gridLine, styles.gridLineVertical, { left: '66.66%' }]} />
-                <View style={[styles.gridLine, styles.gridLineHorizontal, { top: '33.33%' }]} />
-                <View style={[styles.gridLine, styles.gridLineHorizontal, { top: '66.66%' }]} />
-              </View>
-            )}
-            <PinchGestureHandler onGestureEvent={pinchHandler} enabled={editMode === 'crop'}>
-              <Animated.View style={styles.gestureContainer}>
-                <PanGestureHandler onGestureEvent={panHandler} enabled={editMode === 'crop'}>
-                  <Animated.View style={[styles.imageWrapper, animatedStyle]}>
-                    <ExpoImage
-                      source={{ uri: params.imageUri }}
-                      style={styles.image}
-                      contentFit="contain"
-                    />
-                  </Animated.View>
-                </PanGestureHandler>
-              </Animated.View>
-            </PinchGestureHandler>
-          </View>
-        </View>
+        <Canvas style={styles.canvas}>
+            <SkiaImage
+                image={image}
+                x={0}
+                y={0}
+                width={screenWidth}
+                height={screenHeight}
+                fit="contain"
+            />
+            {/* Semi-transparent overlay */}
+            <Rect x={0} y={0} width={screenWidth} height={screenHeight} color="rgba(0, 0, 0, 0.5)" />
+
+            {/* The clear crop area, achieved by clipping */}
+            <Group clip={{ x: cropX, y: cropY, width: cropWidth, height: cropHeight }}>
+                <SkiaImage
+                    image={image}
+                    fit="contain"
+                    x={0}
+                    y={0}
+                    width={screenWidth}
+                    height={screenHeight}
+                />
+            </Group>
+
+            {/* Crop rectangle border */}
+            <Rect
+            x={cropX}
+            y={cropY}
+            width={cropWidth}
+            height={cropHeight}
+            color="white"
+            style="stroke"
+            strokeWidth={2}
+            />
+
+            {/* Corner handles */}
+            <Circle cx={cropX} cy={cropY} r={10} color="white" />
+            <Circle cx={() => cropX.value + cropWidth.value} cy={cropY} r={10} color="white" />
+            <Circle cx={cropX} cy={() => cropY.value + cropHeight.value} r={10} color="white" />
+            <Circle cx={() => cropX.value + cropWidth.value} cy={() => cropY.value + cropHeight.value} r={10} color="white" />
+        </Canvas>
+        <GestureDetector gesture={panGesture}>
+            <Animated.View
+            style={[
+                styles.handle,
+                useAnimatedStyle(() => ({
+                transform: [
+                    { translateX: cropX.value + cropWidth.value - HANDLE_SIZE },
+                    { translateY: cropY.value + cropHeight.value - HANDLE_SIZE },
+                ],
+                })),
+            ]}
+            />
+      </GestureDetector>
       </View>
 
       {editMode === 'crop' && (
         <View style={styles.cropControls}>
+          <View style={styles.aspectRatioGroup}>
+            <Pressable style={styles.aspectRatioButton} onPress={() => handleAspectRatioPress(1 / 1)}>
+              <ThemedText style={styles.aspectRatioText}>1:1</ThemedText>
+            </Pressable>
+            <Pressable style={styles.aspectRatioButton} onPress={() => handleAspectRatioPress(5 / 4)}>
+              <ThemedText style={styles.aspectRatioText}>4:5</ThemedText>
+            </Pressable>
+            <Pressable style={styles.aspectRatioButton} onPress={() => handleAspectRatioPress(9 / 16)}>
+              <ThemedText style={styles.aspectRatioText}>16:9</ThemedText>
+            </Pressable>
+          </View>
           <Pressable style={styles.controlButton} onPress={handleRotate}>
             <Ionicons name="refresh" size={24} color="white" />
             <ThemedText style={styles.controlButtonText}>Rotate</ThemedText>
-          </Pressable>
-          <Pressable style={styles.controlButton} onPress={handleReset}>
-            <Ionicons name="refresh-outline" size={24} color="white" />
-            <ThemedText style={styles.controlButtonText}>Reset</ThemedText>
           </Pressable>
         </View>
       )}
@@ -359,6 +352,12 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingHorizontal: 20,
     paddingBottom: 20,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   headerButton: {
     flexDirection: 'row',
@@ -382,31 +381,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  cropOverlay: {
-    width: screenWidth,
-    height: screenHeight - 200,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cropArea: {
-    width: CROP_AREA_SIZE,
-    height: CROP_AREA_SIZE,
-    borderWidth: 2,
-    borderColor: 'white',
-    borderStyle: 'dashed',
-    overflow: 'hidden',
-  },
-  gestureContainer: {
+  canvas: {
     flex: 1,
-  },
-  imageWrapper: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: '100%',
   },
   image: {
-    width: CROP_AREA_SIZE * 2,
-    height: CROP_AREA_SIZE * 2,
+    flex: 1,
   },
   cropControls: {
     flexDirection: 'row',
@@ -414,6 +394,11 @@ const styles = StyleSheet.create({
     gap: 20,
     paddingVertical: 30,
     paddingHorizontal: 20,
+    position: 'absolute',
+    bottom: 100,
+    left: 0,
+    right: 0,
+    zIndex: 1,
   },
   controlButton: {
     flexDirection: 'row',
@@ -428,9 +413,26 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
   },
+  aspectRatioGroup: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+    marginBottom: 20,
+  },
+  aspectRatioButton: {
+    padding: 10,
+  },
+  aspectRatioText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
   toolbar: {
     height: 100,
     width: '100%',
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -446,24 +448,10 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
-  cropGrid: {
+  handle: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 1,
-  },
-  gridLine: {
-    position: 'absolute',
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  gridLineVertical: {
-    width: 1,
-    height: '100%',
-  },
-  gridLineHorizontal: {
-    height: 1,
-    width: '100%',
+    width: 20,
+    height: 20,
+    backgroundColor: 'rgba(255,255,255,0.001)', // Almost transparent for debugging
   },
 });
