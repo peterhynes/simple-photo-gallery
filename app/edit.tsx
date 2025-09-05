@@ -110,10 +110,6 @@ export default function EditScreen() {
     }
   }, [params.imageUri]);
 
-  const scale = useSharedValue(1);
-  const translateX = useSharedValue(0);
-  const translateY = useSharedValue(0);
-
   const pinchHandler = useAnimatedGestureHandler<
     PinchGestureHandlerGestureEvent,
     PinchContext
@@ -155,10 +151,6 @@ export default function EditScreen() {
       ],
     };
   });
-
-  const handleRotate = useCallback(() => {
-    setRotation((prev) => (prev + 90) % 360);
-  }, []);
 
   const handleRotate = useCallback(() => {
     rotation.value = withSpring((rotation.value + 90) % 360);
