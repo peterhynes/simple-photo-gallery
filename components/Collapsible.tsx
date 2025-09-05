@@ -7,6 +7,31 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 
+/**
+ * `Collapsible` is a memoized React component that provides a collapsible section of content.
+ * It consists of a clickable header that toggles the visibility of its children.
+ *
+ * This component is designed to be a reusable UI element for displaying content that can be
+ * shown or hidden by the user, such as in an accordion or a settings menu.
+ *
+ * Key features of the `Collapsible` component include:
+ * - **Toggleable Content:** The main functionality is to show or hide the `children` content
+ *   when the header is pressed. The state of the collapsible (open or closed) is managed
+ *   internally using the `useState` hook.
+ * - **Animated Icon:** A chevron icon is displayed next to the title, which rotates to indicate
+ *   the current state (e.g., pointing right when closed and down when open). The rotation is
+ *   animated for a smooth user experience.
+ * - **Themed Appearance:** The component uses `ThemedView` and `ThemedText` to ensure that its
+ *   appearance adapts to the current color scheme (light or dark). The icon color is also
+ *   adjusted based on the theme.
+ * - **Memoization:** The component is wrapped in `React.memo` to optimize performance by
+ *   preventing unnecessary re-renders when its props have not changed.
+ *
+ * @param {PropsWithChildren & { title: string }} props - The props for the Collapsible component.
+ * @param {React.ReactNode} props.children - The content to be displayed inside the collapsible section.
+ * @param {string} props.title - The title to be displayed in the header of the collapsible section.
+ * @returns {React.ReactElement} The rendered collapsible component.
+ */
 export const Collapsible = memo(function Collapsible({ 
   children, 
   title 

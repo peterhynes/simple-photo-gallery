@@ -25,6 +25,36 @@ import { ThemedText } from '@/components/ThemedText';
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const CROP_AREA_SIZE = screenWidth - 40;
 
+/**
+ * `EditScreen` is a comprehensive image editing component that allows users to perform basic
+ * transformations on an image, such as panning, pinching (zooming), and rotating.
+ * The screen is designed to provide a rich, interactive experience for editing photos.
+ *
+ * Key features of this screen include:
+ * - **Gesture Handling:** It uses `react-native-gesture-handler` to manage pan and pinch gestures.
+ *   - `PinchGestureHandler` allows users to zoom in and out of the image.
+ *   - `PanGestureHandler` enables users to move the image within the crop area.
+ * - **Animations:** The component leverages `react-native-reanimated` to create smooth animations
+ *   for scaling, translation, and rotation of the image. `useSharedValue` and `useAnimatedStyle`
+ *   are used to manage the animated properties.
+ * - **Image Manipulation:** It utilizes `expo-image-manipulator` to apply the transformations
+ *   (rotation and cropping) to the image when the user saves their changes.
+ * - **UI Controls:** The screen provides a set of UI controls for:
+ *   - **Saving:** Applies the edits and saves the new image to the media library.
+ *   - **Canceling:** Discards the changes and navigates back to the previous screen.
+ *   - **Rotating:** Rotates the image by 90-degree increments.
+ *   - **Resetting:** Resets all transformations to their initial state.
+ * - **Crop Overlay:** A visual crop area with a grid is displayed to guide the user's edits.
+ *   The final image is cropped to this area.
+ * - **State Management:** The component manages the state of the editing process, including
+ *   whether the image is currently being processed, the rotation angle, and the gesture-driven
+ *   transformations.
+ *
+ * The `useLocalSearchParams` hook is used to receive the URI of the image to be edited from the
+ * navigation parameters. After saving, the user is alerted of the success and navigated back.
+ *
+ * @returns {React.ReactElement} The rendered image editing screen.
+ */
 export default function EditScreen() {
   const params = useLocalSearchParams<{ imageUri: string; returnIndex: string }>();
   const router = useRouter();

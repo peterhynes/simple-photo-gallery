@@ -20,6 +20,21 @@ const { width } = Dimensions.get('window');
 const IMAGE_SIZE = width / 3;
 const PAGE_SIZE = 21; // 3 columns * 7 rows
 
+/**
+ * `MediaItem` is a memoized component that renders a single photo or video from the user's media library.
+ * It displays a thumbnail of the media and, if it's a video, overlays a play icon.
+ * The component is designed to be performant within a `FlatList` by using `React.memo` to prevent
+ * unnecessary re-renders.
+ *
+ * When pressed, the component provides visual feedback by reducing its opacity and triggers the `onPress`
+ * callback, which is used to navigate to a detailed view of the media.
+ *
+ * @param {object} props - The props for the MediaItem component.
+ * @param {MediaLibrary.Asset} props.item - The media asset to be displayed. This object contains
+ *   information about the media, such as its URI and media type.
+ * @param {() => void} props.onPress - A callback function that is executed when the media item is pressed.
+ * @returns {React.ReactElement} The rendered media item component.
+ */
 const MediaItem = memo(
   ({
     item,
@@ -60,6 +75,31 @@ const MediaItem = memo(
 
 MediaItem.displayName = 'MediaItem';
 
+/**
+ * The `HomeScreen` component is the main screen of the application, responsible for displaying a grid
+ * of photos and videos from the user's media library. It handles permissions, loading states,
+ * and infinite scrolling.
+ *
+ * Key functionalities of this component include:
+ * - **Permissions Handling:** It uses `MediaLibrary.usePermissions` to request and manage access
+ *   to the user's photo gallery. It provides clear user feedback and actions based on the
+ *   permission status (e.g., loading indicators, permission requests, or a link to settings).
+ * - **Media Loading:** It fetches media assets from the `MediaLibrary` in pages to optimize
+ *   performance. The `loadMedia` function loads the initial set of media, and `loadMoreMedia`
+ *   is used for infinite scrolling.
+ * - **State Management:** The component manages several state variables, including the list of
+ *   media, loading indicators (`isLoading`, `isLoadingMore`), pagination state (`hasNextPage`,
+ *   `endCursor`), and error states.
+ * - **Rendering:** It uses a `FlatList` to efficiently render the grid of media items. The `MediaItem`
+ *   component is used for each item in the grid.
+ * - **Navigation:** When a media item is pressed, it navigates to the `/media` route, passing the
+ *   list of assets and the selected index as parameters.
+ *
+ * The component provides a robust and user-friendly experience for browsing a media gallery,
+ * with proper handling of loading, permissions, and error states.
+ *
+ * @returns {React.ReactElement} The rendered home screen component.
+ */
 export default function HomeScreen() {
   const router = useRouter();
   const [media, setMedia] = useState<MediaLibrary.Asset[]>([]);

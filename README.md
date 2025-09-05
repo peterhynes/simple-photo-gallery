@@ -1,50 +1,85 @@
-# Welcome to your Expo app 👋
+# Simple Photo Gallery
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+This is a simple photo gallery application built with Expo. It allows users to browse their photo and video library, view media in full-screen, and perform basic image editing tasks such as cropping, rotating, and zooming.
 
-## Get started
+The application is designed to be a showcase of modern React Native development practices, including:
 
-1. Install dependencies
+- **File-based routing** with `expo-router`.
+- **Theme support** for light and dark modes.
+- **Cross-platform compatibility** for iOS, Android, and web.
+- **Performant media handling** with `expo-image` and `expo-video`.
+- **Gesture-based interactions** using `react-native-gesture-handler` and `react-native-reanimated`.
+- **Native-like UI elements**, such as SF Symbols on iOS and blurred backgrounds.
 
-   ```bash
-   npm install
-   ```
+## Features
 
-2. Start the app
+- **Media Grid:** Displays a grid of photos and videos from the user's media library.
+- **Infinite Scrolling:** Loads more media as the user scrolls down.
+- **Full-Screen Viewer:** Allows users to view photos and videos in full-screen with horizontal swiping.
+- **Video Playback:** Plays videos directly in the full-screen viewer.
+- **Image Editor:** Provides tools to crop, rotate, and zoom photos.
+- **Themed Interface:** Adapts to the user's system-wide light or dark mode settings.
 
-   ```bash
-   npx expo start
-   ```
+## Get Started
 
-In the output, you'll find options to open the app in a
+To run this project locally, follow these steps:
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+1.  **Install dependencies:**
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+    ```bash
+    npm install
+    ```
 
-## Get a fresh project
+2.  **Start the development server:**
 
-When you're ready, run:
+    ```bash
+    npx expo start
+    ```
 
-```bash
-npm run reset-project
-```
+    This will open the Expo DevTools in your browser. From there, you can:
+    -   Run the app on an **iOS simulator** (macOS only).
+    -   Run the app on an **Android emulator**.
+    -   Run the app on a physical device using the **Expo Go** app.
+    -   Run the app in a **web browser**.
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Project Structure
 
-## Learn more
+The main source code for the application is organized into the following directories:
 
-To learn more about developing your project with Expo, look at the following resources:
+-   `app/`: Contains all the screens and navigation logic, using file-based routing.
+    -   `(tabs)/`: Defines the layout and screens for the bottom tab navigator.
+    -   `edit.tsx`: The image editing screen.
+    -   `media.tsx`: The full-screen media viewer.
+-   `components/`: Includes reusable UI components used throughout the application.
+    -   `ui/`: Contains low-level UI elements like icons and themed views.
+-   `constants/`: Stores constant values, such as color palettes for themes.
+-   `hooks/`: Holds custom React hooks, such as `useThemeColor` for theme-aware components.
+-   `assets/`: Contains static assets like images and fonts.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Key Technologies
 
-## Join the community
+This project is built with a variety of modern technologies, including:
 
-Join our community of developers creating universal apps.
+-   [Expo](https://expo.dev/): The framework for building the application.
+-   [React Native](https://reactnative.dev/): The core library for building native UIs with React.
+-   [Expo Router](https://docs.expo.dev/router/introduction/): For file-based navigation.
+-   [Expo Image](https://docs.expo.dev/versions/latest/sdk/image/): For high-performance image rendering.
+-   [Expo Video](https://docs.expo.dev/versions/latest/sdk/video/): For video playback.
+-   [Expo MediaLibrary](https://docs.expo.dev/versions/latest/sdk/media-library/): To access the user's photo and video library.
+-   [Expo Image Manipulator](https://docs.expo.dev/versions/latest/sdk/imagemanipulator/): For image editing functionalities.
+-   [React Native Reanimated](https://docs.swmansion.com/react-native-reanimated/): For creating smooth animations.
+-   [React Native Gesture Handler](https://docs.swmansion.com/react-native-gesture-handler/): For handling complex gestures.
+-   [TypeScript](https://www.typescriptlang.org/): For type-safe JavaScript development.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Learn More
+
+To learn more about the technologies used in this project, refer to the following resources:
+
+-   [Expo Documentation](https://docs.expo.dev/): The official documentation for the Expo framework.
+-   [React Native Documentation](https://reactnative.dev/docs/getting-started): The official documentation for React Native.
+-   [Expo Router Documentation](https://docs.expo.dev/router/introduction/): Learn more about file-based routing with Expo.
+
+## Join the Community
+
+-   [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
+-   [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
